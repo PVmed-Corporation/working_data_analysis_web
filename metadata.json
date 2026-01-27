@@ -1,0 +1,5 @@
+{
+  "name": "ZenTao Analytics Suite",
+  "description": "An integrated dashboard combining Work Log Analysis, Code Submission Analysis, and Project Progress Analysis with local data persistence.",
+  "requestFramePermissions": []
+}
