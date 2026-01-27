@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { UploadCloud, Calendar, Trash2, AlertCircle, BarChart3, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, Trash2, AlertCircle, BarChart3, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { parseCodeSubmissionFile } from '../services/parsers';
 import { saveCodeAnalysisReport, getAllCodeAnalysisReports, deleteCodeAnalysisReport } from '../services/db';
 import { WeeklyReport, DataStore } from '../types';
+import { UploadArea } from '../components/UploadArea';
 
 // --- Shared Components ---
 const COLORS = { pure_commit: '#3b82f6', code_review: '#22c55e' };
@@ -69,7 +70,6 @@ export const CodeSubmissionView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     getAllCodeAnalysisReports().then(store => {
@@ -79,23 +79,36 @@ export const CodeSubmissionView: React.FC = () => {
     });
   }, []);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFilesProcess = async (files: File[]) => {
     setError(null);
     setIsLoading(true);
-    try {
-      const report = await parseCodeSubmissionFile(file);
-      await saveCodeAnalysisReport(report.date, report);
+    let successCount = 0;
+    const errors: string[] = [];
+
+    for (const file of files) {
+       try {
+         const report = await parseCodeSubmissionFile(file);
+         await saveCodeAnalysisReport(report.date, report);
+         successCount++;
+       } catch (err: any) {
+         errors.push(`${file.name}: ${err.message}`);
+       }
+    }
+
+    if (successCount > 0) {
       const store = await getAllCodeAnalysisReports();
       setDataStore(store);
-      setCurrentDate(report.date);
-    } catch (err: any) {
-      setError(err.message || "Failed to parse file");
-    } finally {
-      setIsLoading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      // If no current date selected, select the latest
+      if (!currentDate) {
+        const dates = Object.keys(store).sort((a, b) => b.localeCompare(a));
+        if (dates.length > 0) setCurrentDate(dates[0]);
+      }
     }
+    
+    if (errors.length > 0) {
+      setError(errors.join(' | '));
+    }
+    setIsLoading(false);
   };
 
   const handleDeleteReport = async (dateToDelete: string, e: React.MouseEvent) => {
@@ -122,11 +135,8 @@ export const CodeSubmissionView: React.FC = () => {
         }`}>
         <div className="w-64 h-full flex flex-col p-4 gap-4">
           <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-             <button onClick={() => fileInputRef.current?.click()} disabled={isLoading} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-lg font-medium transition-all shadow-sm">
-               {isLoading ? "Processing..." : <><UploadCloud size={18} /> Upload Analysis</>}
-             </button>
-             <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx,.xls" className="hidden" />
-             {error && <div className="mt-3 p-2 bg-red-50 text-red-600 text-xs rounded border border-red-100 flex gap-1"><AlertCircle size={14} className="shrink-0 mt-0.5" />{error}</div>}
+             <UploadArea onFilesSelect={handleFilesProcess} isLoading={isLoading} title="Upload Analysis" compact={true} />
+             {error && <div className="mt-3 p-2 bg-red-50 text-red-600 text-xs rounded border border-red-100 flex gap-1 overflow-auto max-h-20"><AlertCircle size={14} className="shrink-0 mt-0.5" />{error}</div>}
           </div>
           
           <div className="flex-1 overflow-y-auto">
@@ -149,14 +159,16 @@ export const CodeSubmissionView: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 p-6 overflow-y-auto bg-gray-50">
-        <div className="flex items-center gap-4 mb-4">
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-            title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-          >
-            {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
-          </button>
+        <div className="flex items-center gap-4 mb-4 justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            >
+              {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+            </button>
+          </div>
         </div>
 
         {!activeReport ? (

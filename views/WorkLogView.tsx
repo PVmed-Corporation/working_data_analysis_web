@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { UploadCloud, Calendar, SlidersHorizontal, User, Clock, AlignLeft, RefreshCw, Layers, FileSpreadsheet, Loader2, AlertCircle, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Calendar, SlidersHorizontal, User, Clock, AlignLeft, RefreshCw, Layers, FileSpreadsheet, AlertCircle, PanelLeftClose, PanelLeftOpen, Download } from 'lucide-react';
 import { parseWorkLogBuffer, aggregateWorkLogs } from '../services/parsers';
 import { saveWorkLogs, getAllWorkLogs, clearWorkLogs } from '../services/db';
 import { WeeklyRecord } from '../types';
+import { exportWorkLogReport } from '../services/exportService';
+import { UploadArea } from '../components/UploadArea';
 
 // --- Shared Internal Components ---
 const DateFilter: React.FC<{
@@ -113,19 +115,6 @@ const TimesheetTable: React.FC<{ data: any }> = ({ data }) => {
   );
 };
 
-const UploadArea: React.FC<{ onFilesSelect: (files: File[]) => void; isLoading: boolean }> = ({ onFilesSelect, isLoading }) => {
-  const [isDragging, setIsDragging] = useState(false);
-  return (
-    <div onDragOver={(e)=>{e.preventDefault();setIsDragging(true)}} onDragLeave={(e)=>{e.preventDefault();setIsDragging(false)}} onDrop={(e)=>{e.preventDefault();setIsDragging(false);if(e.dataTransfer.files.length)onFilesSelect(Array.from(e.dataTransfer.files))}} className={`relative group cursor-pointer flex flex-col items-center justify-center w-full h-40 rounded-2xl border-2 border-dashed transition-all duration-300 ${isDragging?"border-blue-500 bg-blue-50/50":"border-gray-300 hover:border-gray-400 bg-white"}`}>
-      <input type="file" multiple className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".xlsx, .xls" onChange={(e)=>e.target.files?.length && onFilesSelect(Array.from(e.target.files))} disabled={isLoading} />
-      <div className="flex flex-col items-center space-y-3 text-center p-4">
-        <div className={`p-2 rounded-full ${isDragging?"bg-blue-100 text-blue-600":"bg-gray-100 text-gray-500"}`}>{isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <UploadCloud className="w-5 h-5" />}</div>
-        <div><p className="text-sm font-semibold text-gray-700">{isLoading ? "Processing..." : "Upload Weekly Reports"}</p><p className="text-[10px] text-gray-500 mt-1">Supports .xlsx or .xls</p></div>
-      </div>
-    </div>
-  );
-};
-
 // --- Main Work Log View ---
 export const WorkLogView: React.FC = () => {
   const [allRecords, setAllRecords] = useState<WeeklyRecord[]>([]);
@@ -218,7 +207,7 @@ export const WorkLogView: React.FC = () => {
                    <p className="text-gray-500 text-lg">Upload standard ZenTao Excel exports to analyze weekly efforts.</p>
                 </div>
                 <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
-                    <UploadArea onFilesSelect={handleFilesProcess} isLoading={loading} />
+                    <UploadArea onFilesSelect={handleFilesProcess} isLoading={loading} title="Upload Weekly Reports" description="Supports .xlsx or .xls" />
                     {error && <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200 text-sm flex items-start gap-2"><AlertCircle className="w-5 h-5 shrink-0" />{error}</div>}
                 </div>
              </div>
@@ -257,7 +246,7 @@ export const WorkLogView: React.FC = () => {
                             <div className="flex items-center justify-between">
                                 <h3 className="text-sm font-bold text-gray-700">Import Data</h3>
                             </div>
-                            <UploadArea onFilesSelect={handleFilesProcess} isLoading={loading} />
+                            <UploadArea onFilesSelect={handleFilesProcess} isLoading={loading} title="Upload Weekly Reports" />
                         </div>
 
                         {displayData && (
@@ -272,18 +261,23 @@ export const WorkLogView: React.FC = () => {
             {/* Main Content Area */}
             <main className="flex-1 flex flex-col h-full overflow-hidden bg-gray-50/50 relative">
                <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                   <div className="flex items-center gap-4">
-                      <button
-                        onClick={() => setSidebarOpen(!isSidebarOpen)}
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                        title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-                      >
-                        {isSidebarOpen ? <PanelLeftClose className="w-6 h-6" /> : <PanelLeftOpen className="w-6 h-6" />}
-                      </button>
-                      <div>
-                          <h1 className="text-2xl font-bold text-gray-900">工作日志数据分析</h1>
-                          <p className="text-sm text-gray-500 mt-1">Weekly effort analysis and content breakdown</p>
+                   <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                          <button
+                            onClick={() => setSidebarOpen(!isSidebarOpen)}
+                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+                          >
+                            {isSidebarOpen ? <PanelLeftClose className="w-6 h-6" /> : <PanelLeftOpen className="w-6 h-6" />}
+                          </button>
+                          <div>
+                              <h1 className="text-2xl font-bold text-gray-900">工作日志数据分析</h1>
+                              <p className="text-sm text-gray-500 mt-1">Weekly effort analysis and content breakdown</p>
+                          </div>
                       </div>
+                      <button onClick={() => exportWorkLogReport(allRecords)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
+                        <Download size={18} /> Export HTML
+                      </button>
                    </div>
 
                    <DateFilter allDates={allAvailableDates} currentStart={startDate} currentEnd={endDate} onFilterChange={(s, e) => { setStartDate(s); setEndDate(e); }} />

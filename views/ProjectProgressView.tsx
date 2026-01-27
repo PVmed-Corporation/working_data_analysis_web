@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { LayoutGrid, Upload, FolderOpen, ChevronDown, ChevronRight, FileText, Trash2, Clock, Users, TrendingUp, Download, Calendar, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { LayoutGrid, FolderOpen, ChevronDown, ChevronRight, FileText, Trash2, Clock, Users, Calendar, PanelLeftClose, PanelLeftOpen, AlertCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LabelList, PieChart, Pie, Cell, Legend } from 'recharts';
 import { v4 as uuidv4 } from 'uuid';
 import { parseProjectProgressFile, parseFilename } from '../services/parsers';
 import { saveProjectReport, getAllProjectReports, deleteProjectReport, deleteProjectByName } from '../services/db';
-import { ProjectReport, ProjectGroup, ParsedProjectData, ToastMessage } from '../types';
+import { ProjectReport, ProjectGroup, ParsedProjectData } from '../types';
+import { UploadArea } from '../components/UploadArea';
 
 // --- Utils ---
 const groupReportsByProject = (reports: ProjectReport[]): ProjectGroup[] => {
@@ -24,14 +25,15 @@ const Sidebar: React.FC<{
   groups: ProjectGroup[];
   selectedId: string | null;
   onSelect: (r: ProjectReport) => void;
-  onUpload: (f: File) => void;
+  onUpload: (f: File[]) => void;
   onDeleteProject: (name: string) => void;
   onDeleteReport: (id: string) => void;
   isOpen: boolean;
-}> = ({ groups, selectedId, onSelect, onUpload, onDeleteProject, onDeleteReport, isOpen }) => {
+  isLoading: boolean;
+  error: string | null;
+}> = ({ groups, selectedId, onSelect, onUpload, onDeleteProject, onDeleteReport, isOpen, isLoading, error }) => {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggle = (name: string) => setExpanded(p => ({ ...p, [name]: !p[name] }));
-  const fileInput = useRef<HTMLInputElement>(null);
 
   return (
     <aside className={`bg-white border-r border-gray-200 flex flex-col shrink-0 transition-all duration-300 ease-in-out ${
@@ -39,11 +41,8 @@ const Sidebar: React.FC<{
     }`}>
       <div className="w-64 h-full flex flex-col p-4 gap-4">
        <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-          <button onClick={() => fileInput.current?.click()} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-lg font-medium transition-all shadow-sm">
-             <Upload size={18} /> Upload Analysis
-          </button>
-          <input type="file" ref={fileInput} className="hidden" accept=".xlsx" onChange={e => { if(e.target.files?.[0]) { onUpload(e.target.files[0]); e.target.value=''; } }} />
-          <p className="text-[10px] text-gray-500 mt-2 text-center">Format: yyyy-mm-dd_ProjectName_analysis.xlsx</p>
+          <UploadArea onFilesSelect={onUpload} isLoading={isLoading} title="Upload Analysis" description="Format: yyyy-mm-dd_ProjectName_analysis.xlsx" compact={true} />
+          {error && <div className="mt-3 p-2 bg-red-50 text-red-600 text-xs rounded border border-red-100 flex gap-1 overflow-auto max-h-20"><AlertCircle size={14} className="shrink-0 mt-0.5" />{error}</div>}
        </div>
        
        <div className="flex-1 overflow-y-auto space-y-1">
@@ -172,6 +171,7 @@ export const ProjectProgressView: React.FC = () => {
   const [reports, setReports] = useState<ProjectReport[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
   useEffect(() => {
@@ -181,36 +181,59 @@ export const ProjectProgressView: React.FC = () => {
   const projectGroups = useMemo(() => groupReportsByProject(reports), [reports]);
   const selectedReport = useMemo(() => reports.find(r => r.id === selectedId), [reports, selectedId]);
 
-  const handleUpload = async (file: File) => {
-    const meta = parseFilename(file.name);
-    if (!meta) { alert('Invalid filename. Use yyyy-mm-dd_ProjectName_analysis.xlsx'); return; }
-    
+  const handleUpload = async (files: File[]) => {
     setIsLoading(true);
-    try {
-       const parsed = await parseProjectProgressFile(file);
-       
-       // Deduplication Logic: Check if duplicate exists based on ProjectName and Date
-       const existingReport = reports.find(r => r.projectName === meta.projectName && r.date === meta.date);
-       
-       // If exists, reuse the ID to overwrite; otherwise generate new UUID
-       const reportId = existingReport ? existingReport.id : uuidv4();
-       
-       const newReport: ProjectReport = { 
-         id: reportId, 
-         fileName: file.name, 
-         projectName: meta.projectName, 
-         date: meta.date, 
-         data: parsed 
-       };
-       
-       await saveProjectReport(newReport);
-       setReports(await getAllProjectReports());
-       setSelectedId(reportId);
-    } catch (e: any) {
-       alert(e.message);
-    } finally {
-       setIsLoading(false);
+    setError(null);
+    let successCount = 0;
+    const errors: string[] = [];
+
+    // Pre-fetch reports to deduplicate correctly across multiple files in the same batch
+    // (though real-time update in loop is safer if many files overwrite each other)
+    let currentReports = [...reports];
+
+    for (const file of files) {
+      const meta = parseFilename(file.name);
+      if (!meta) {
+        errors.push(`${file.name}: Invalid filename format`);
+        continue;
+      }
+      
+      try {
+         const parsed = await parseProjectProgressFile(file);
+         
+         const existingReport = currentReports.find(r => r.projectName === meta.projectName && r.date === meta.date);
+         const reportId = existingReport ? existingReport.id : uuidv4();
+         
+         const newReport: ProjectReport = { 
+           id: reportId, 
+           fileName: file.name, 
+           projectName: meta.projectName, 
+           date: meta.date, 
+           data: parsed 
+         };
+         
+         await saveProjectReport(newReport);
+         
+         // Update local list to handle next iteration correctly if overwriting
+         const idx = currentReports.findIndex(r => r.id === reportId);
+         if (idx >= 0) currentReports[idx] = newReport;
+         else currentReports.push(newReport);
+
+         successCount++;
+         // If this is the only one (or last successful one), select it
+         if (files.length === 1 || successCount === 1) {
+            setSelectedId(reportId);
+         }
+      } catch (e: any) {
+         errors.push(`${file.name}: ${e.message}`);
+      }
     }
+
+    setReports(await getAllProjectReports());
+    if (errors.length > 0) {
+      setError(errors.join(' | '));
+    }
+    setIsLoading(false);
   };
 
   const handleDeleteProject = async (name: string) => {
@@ -227,19 +250,21 @@ export const ProjectProgressView: React.FC = () => {
 
   return (
     <div className="flex h-full min-h-[calc(100vh-6rem)]">
-      <Sidebar groups={projectGroups} selectedId={selectedId} onSelect={r => setSelectedId(r.id)} onUpload={handleUpload} onDeleteProject={handleDeleteProject} onDeleteReport={handleDeleteReport} isOpen={isSidebarOpen} />
+      <Sidebar groups={projectGroups} selectedId={selectedId} onSelect={r => setSelectedId(r.id)} onUpload={handleUpload} onDeleteProject={handleDeleteProject} onDeleteReport={handleDeleteReport} isOpen={isSidebarOpen} isLoading={isLoading} error={error} />
       <main className="flex-1 p-6 bg-slate-50 overflow-y-auto">
-        <div className="flex items-center gap-4 mb-4">
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-            title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-          >
-            {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
-          </button>
+        <div className="flex items-center gap-4 mb-4 justify-between">
+          <div className="flex items-center gap-4">
+              <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+              >
+                {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+              </button>
+          </div>
         </div>
         
-        {isLoading && <div className="text-center text-indigo-600">Processing...</div>}
+        {isLoading && !selectedReport && <div className="text-center text-indigo-600 mt-20">Processing...</div>}
         {selectedReport ? (
            <div className="animate-in fade-in">
               <header className="mb-8 flex justify-between items-center">
@@ -252,10 +277,12 @@ export const ProjectProgressView: React.FC = () => {
               <Charts data={selectedReport.data} projectName={selectedReport.projectName} />
            </div>
         ) : (
-           <div className="flex flex-col items-center justify-center h-full text-slate-400">
-              <LayoutGrid size={48} className="mb-4 text-slate-300" />
-              <p>Select a project report from the sidebar</p>
-           </div>
+           !isLoading && (
+            <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                <LayoutGrid size={48} className="mb-4 text-slate-300" />
+                <p>Select a project report from the sidebar</p>
+            </div>
+           )
         )}
       </main>
     </div>
