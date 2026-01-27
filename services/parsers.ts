@@ -1,5 +1,18 @@
+
 import * as XLSX from 'xlsx';
 import { WeeklyRecord, AnalysisRow, ProjectStat, WeeklyReport, ParsedProjectData, SummaryRow, DetailRow } from '../types';
+
+// Helper to extract all sheets as raw data
+const extractRawSheets = (workbook: XLSX.WorkBook): Record<string, any[][]> => {
+  const sheets: Record<string, any[][]> = {};
+  workbook.SheetNames.forEach(name => {
+    const sheet = workbook.Sheets[name];
+    // header: 1 returns array of arrays (2D array) which preserves structure
+    // defval: '' ensures empty cells are returned as empty strings instead of skipped/undefined
+    sheets[name] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  });
+  return sheets;
+};
 
 // --- App 1: Work Log Parser ---
 export const parseWorkLogBuffer = (buffer: ArrayBuffer): WeeklyRecord[] => {
@@ -193,6 +206,10 @@ export const parseCodeSubmissionFile = async (file: File): Promise<WeeklyReport>
         const data = e.target?.result;
         if (!data) throw new Error("File is empty");
         const workbook = XLSX.read(data, { type: 'array' });
+        
+        // Extract raw data from all sheets
+        const rawSheets = extractRawSheets(workbook);
+
         const sheetNames = workbook.SheetNames;
 
         const analysisSheetName = sheetNames.find(n => normalizeKey(n).includes('analysis'));
@@ -271,7 +288,8 @@ export const parseCodeSubmissionFile = async (file: File): Promise<WeeklyReport>
           fileName: file.name,
           analysis: analysisData,
           projects: projectStats,
-          timestamp: new Date(reportDate).getTime()
+          timestamp: new Date(reportDate).getTime(),
+          rawSheets: rawSheets // Include raw sheets
         });
       } catch (error) {
         reject(error);
@@ -283,7 +301,7 @@ export const parseCodeSubmissionFile = async (file: File): Promise<WeeklyReport>
 
 
 // --- App 3: Project Progress Parser ---
-export const parseProjectProgressFile = async (file: File): Promise<ParsedProjectData> => {
+export const parseProjectProgressFile = async (file: File): Promise<ParsedProjectData & { rawSheets?: Record<string, any[][]> }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -291,6 +309,9 @@ export const parseProjectProgressFile = async (file: File): Promise<ParsedProjec
         const data = e.target?.result;
         if (!data) throw new Error("File is empty");
         const workbook = XLSX.read(data, { type: 'binary' });
+
+        // Extract raw data from all sheets
+        const rawSheets = extractRawSheets(workbook);
 
         if (!workbook.SheetNames.includes('summary') || !workbook.SheetNames.includes('details')) {
           throw new Error("Missing required sheets: 'summary' or 'details'");
@@ -359,7 +380,7 @@ export const parseProjectProgressFile = async (file: File): Promise<ParsedProjec
           value: parseFloat(memberTimeMap[key].toFixed(1))
         })).sort((a, b) => b.value - a.value);
 
-        resolve({ summary, details, totalTime, statusDistribution, memberTimeStats });
+        resolve({ summary, details, totalTime, statusDistribution, memberTimeStats, rawSheets }); // Include raw sheets
       } catch (err) {
         reject(err);
       }

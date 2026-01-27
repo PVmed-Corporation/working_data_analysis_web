@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { LayoutGrid, FolderOpen, ChevronDown, ChevronRight, FileText, Trash2, Clock, Users, Calendar, PanelLeftClose, PanelLeftOpen, AlertCircle } from 'lucide-react';
+import { LayoutGrid, FolderOpen, ChevronDown, ChevronRight, FileText, Trash2, Clock, Users, Calendar, PanelLeftClose, PanelLeftOpen, AlertCircle, Table, BarChart as ChartIcon } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LabelList, PieChart, Pie, Cell, Legend } from 'recharts';
 import { v4 as uuidv4 } from 'uuid';
 import { parseProjectProgressFile, parseFilename } from '../services/parsers';
 import { saveProjectReport, getAllProjectReports, deleteProjectReport, deleteProjectByName } from '../services/db';
 import { ProjectReport, ProjectGroup, ParsedProjectData } from '../types';
 import { UploadArea } from '../components/UploadArea';
+import { RawDataViewer } from '../components/RawDataViewer';
 
 // --- Utils ---
 const groupReportsByProject = (reports: ProjectReport[]): ProjectGroup[] => {
@@ -173,6 +174,7 @@ export const ProjectProgressView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [viewMode, setViewMode] = useState<'chart' | 'raw'>('chart');
   
   useEffect(() => {
     getAllProjectReports().then(setReports);
@@ -209,7 +211,8 @@ export const ProjectProgressView: React.FC = () => {
            fileName: file.name, 
            projectName: meta.projectName, 
            date: meta.date, 
-           data: parsed 
+           data: parsed,
+           rawSheets: parsed.rawSheets
          };
          
          await saveProjectReport(newReport);
@@ -251,8 +254,8 @@ export const ProjectProgressView: React.FC = () => {
   return (
     <div className="flex h-full min-h-[calc(100vh-6rem)]">
       <Sidebar groups={projectGroups} selectedId={selectedId} onSelect={r => setSelectedId(r.id)} onUpload={handleUpload} onDeleteProject={handleDeleteProject} onDeleteReport={handleDeleteReport} isOpen={isSidebarOpen} isLoading={isLoading} error={error} />
-      <main className="flex-1 p-6 bg-slate-50 overflow-y-auto">
-        <div className="flex items-center gap-4 mb-4 justify-between">
+      <main className="flex-1 p-6 bg-slate-50 overflow-y-auto flex flex-col">
+        <div className="flex items-center gap-4 mb-4 justify-between shrink-0">
           <div className="flex items-center gap-4">
               <button
                 onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -261,20 +264,45 @@ export const ProjectProgressView: React.FC = () => {
               >
                 {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
               </button>
+              {selectedReport && (
+               <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-sm">
+                  <button 
+                    onClick={() => setViewMode('chart')}
+                    className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-all ${viewMode === 'chart' ? 'bg-indigo-50 text-indigo-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                     <ChartIcon size={16} /> Charts
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('raw')}
+                    className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-all ${viewMode === 'raw' ? 'bg-indigo-50 text-indigo-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                     <Table size={16} /> Raw Data
+                  </button>
+               </div>
+            )}
           </div>
         </div>
         
         {isLoading && !selectedReport && <div className="text-center text-indigo-600 mt-20">Processing...</div>}
         {selectedReport ? (
-           <div className="animate-in fade-in">
-              <header className="mb-8 flex justify-between items-center">
+           <div className="flex-1 flex flex-col min-h-0 animate-in fade-in">
+              <header className="mb-8 flex justify-between items-center shrink-0">
                  <div>
                     <h2 className="text-2xl font-bold text-slate-800">{selectedReport.projectName}</h2>
                     <p className="text-sm text-slate-500 flex items-center gap-2"><Calendar size={14} /> Report Date: {selectedReport.date}</p>
                  </div>
                  <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold uppercase">Project Analysis</span>
               </header>
-              <Charts data={selectedReport.data} projectName={selectedReport.projectName} />
+
+              {viewMode === 'chart' ? (
+                <div className="overflow-y-auto">
+                    <Charts data={selectedReport.data} projectName={selectedReport.projectName} />
+                </div>
+              ) : (
+                <div className="flex-1 min-h-0">
+                    <RawDataViewer sheets={selectedReport.rawSheets || {}} />
+                </div>
+              )}
            </div>
         ) : (
            !isLoading && (

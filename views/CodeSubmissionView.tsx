@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Trash2, AlertCircle, BarChart3, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Calendar, Trash2, AlertCircle, BarChart3, PanelLeftClose, PanelLeftOpen, Table, BarChart as ChartIcon } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { parseCodeSubmissionFile } from '../services/parsers';
 import { saveCodeAnalysisReport, getAllCodeAnalysisReports, deleteCodeAnalysisReport } from '../services/db';
 import { WeeklyReport, DataStore } from '../types';
 import { UploadArea } from '../components/UploadArea';
+import { RawDataViewer } from '../components/RawDataViewer';
 
 // --- Shared Components ---
 const COLORS = { pure_commit: '#3b82f6', code_review: '#22c55e' };
@@ -70,6 +71,7 @@ export const CodeSubmissionView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [viewMode, setViewMode] = useState<'chart' | 'raw'>('chart');
 
   useEffect(() => {
     getAllCodeAnalysisReports().then(store => {
@@ -158,8 +160,8 @@ export const CodeSubmissionView: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 overflow-y-auto bg-gray-50">
-        <div className="flex items-center gap-4 mb-4 justify-between">
+      <main className="flex-1 p-6 overflow-y-auto bg-gray-50 flex flex-col">
+        <div className="flex items-center gap-4 mb-4 justify-between shrink-0">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -168,6 +170,22 @@ export const CodeSubmissionView: React.FC = () => {
             >
               {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
             </button>
+            {activeReport && (
+               <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-sm">
+                  <button 
+                    onClick={() => setViewMode('chart')}
+                    className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-all ${viewMode === 'chart' ? 'bg-indigo-50 text-indigo-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                     <ChartIcon size={16} /> Charts
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('raw')}
+                    className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-all ${viewMode === 'raw' ? 'bg-indigo-50 text-indigo-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                     <Table size={16} /> Raw Data
+                  </button>
+               </div>
+            )}
           </div>
         </div>
 
@@ -177,15 +195,22 @@ export const CodeSubmissionView: React.FC = () => {
              <p>Select a report or upload a new one.</p>
           </div>
         ) : (
-          <div className="space-y-6 animate-in fade-in">
-             <header className="mb-6">
+          <div className="flex-1 flex flex-col min-h-0 animate-in fade-in">
+             <header className="mb-6 shrink-0">
                 <h2 className="text-2xl font-bold text-gray-800">代码提交数据分析</h2>
                 <p className="text-gray-500 text-sm">Report Date: {activeReport.date} | Source: {activeReport.fileName}</p>
              </header>
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-               <TeamPerformanceChart data={activeReport.analysis} />
-               <ProjectDistributionChart data={activeReport.projects} />
-             </div>
+
+             {viewMode === 'chart' ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-y-auto">
+                   <TeamPerformanceChart data={activeReport.analysis} />
+                   <ProjectDistributionChart data={activeReport.projects} />
+                </div>
+             ) : (
+                <div className="flex-1 min-h-0">
+                   <RawDataViewer sheets={activeReport.rawSheets || {}} />
+                </div>
+             )}
           </div>
         )}
       </main>

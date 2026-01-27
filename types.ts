@@ -1,3 +1,4 @@
+
 // --- Work Log Analysis Types ---
 export interface ParsedWorkLogData {
   raw: any[];
@@ -30,6 +31,7 @@ export interface WeeklyReport {
   analysis: AnalysisRow[];
   projects: ProjectStat[];
   timestamp: number;
+  rawSheets?: Record<string, any[][]>; // Added raw data storage
 }
 
 export type DataStore = Record<string, WeeklyReport>;
@@ -63,6 +65,7 @@ export interface ProjectReport {
   projectName: string;
   date: string;
   data: ParsedProjectData;
+  rawSheets?: Record<string, any[][]>; // Added raw data storage
 }
 
 export interface ProjectGroup {
