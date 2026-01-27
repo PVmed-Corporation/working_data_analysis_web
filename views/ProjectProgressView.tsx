@@ -109,7 +109,7 @@ const Charts: React.FC<{ data: ParsedProjectData; projectName: string }> = ({ da
                           const x = cx + radius * Math.cos(-midAngle * (Math.PI / 180));
                           const y = cy + radius * Math.sin(-midAngle * (Math.PI / 180));
                           return percent > 0 ? (
-                            <text x={x} y={y} fill="#64748b" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
+                            <text x={x} y={y} fill="#000000" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
                               {`${(percent * 100).toFixed(0)}%`}
                             </text>
                           ) : null;

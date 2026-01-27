@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { UploadCloud, Calendar, SlidersHorizontal, User, Clock, AlignLeft, RefreshCw, Layers, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { UploadCloud, Calendar, SlidersHorizontal, User, Clock, AlignLeft, RefreshCw, Layers, FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
 import { parseWorkLogBuffer, aggregateWorkLogs } from '../services/parsers';
 import { saveWorkLogs, getAllWorkLogs, clearWorkLogs } from '../services/db';
 import { WeeklyRecord } from '../types';
@@ -116,11 +116,11 @@ const TimesheetTable: React.FC<{ data: any }> = ({ data }) => {
 const UploadArea: React.FC<{ onFilesSelect: (files: File[]) => void; isLoading: boolean }> = ({ onFilesSelect, isLoading }) => {
   const [isDragging, setIsDragging] = useState(false);
   return (
-    <div onDragOver={(e)=>{e.preventDefault();setIsDragging(true)}} onDragLeave={(e)=>{e.preventDefault();setIsDragging(false)}} onDrop={(e)=>{e.preventDefault();setIsDragging(false);if(e.dataTransfer.files.length)onFilesSelect(Array.from(e.dataTransfer.files))}} className={`relative group cursor-pointer flex flex-col items-center justify-center w-full h-48 rounded-2xl border-2 border-dashed transition-all duration-300 ${isDragging?"border-blue-500 bg-blue-50/50":"border-gray-300 hover:border-gray-400 bg-white"}`}>
+    <div onDragOver={(e)=>{e.preventDefault();setIsDragging(true)}} onDragLeave={(e)=>{e.preventDefault();setIsDragging(false)}} onDrop={(e)=>{e.preventDefault();setIsDragging(false);if(e.dataTransfer.files.length)onFilesSelect(Array.from(e.dataTransfer.files))}} className={`relative group cursor-pointer flex flex-col items-center justify-center w-full h-40 rounded-2xl border-2 border-dashed transition-all duration-300 ${isDragging?"border-blue-500 bg-blue-50/50":"border-gray-300 hover:border-gray-400 bg-white"}`}>
       <input type="file" multiple className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".xlsx, .xls" onChange={(e)=>e.target.files?.length && onFilesSelect(Array.from(e.target.files))} disabled={isLoading} />
-      <div className="flex flex-col items-center space-y-4 text-center p-6">
-        <div className={`p-3 rounded-full ${isDragging?"bg-blue-100 text-blue-600":"bg-gray-100 text-gray-500"}`}>{isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : <UploadCloud className="w-6 h-6" />}</div>
-        <div><p className="text-base font-semibold text-gray-700">{isLoading ? "Processing..." : "Upload Weekly Reports"}</p><p className="text-xs text-gray-500">Supports .xlsx or .xls</p></div>
+      <div className="flex flex-col items-center space-y-3 text-center p-4">
+        <div className={`p-2 rounded-full ${isDragging?"bg-blue-100 text-blue-600":"bg-gray-100 text-gray-500"}`}>{isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <UploadCloud className="w-5 h-5" />}</div>
+        <div><p className="text-sm font-semibold text-gray-700">{isLoading ? "Processing..." : "Upload Weekly Reports"}</p><p className="text-[10px] text-gray-500 mt-1">Supports .xlsx or .xls</p></div>
       </div>
     </div>
   );
@@ -205,50 +205,85 @@ export const WorkLogView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-       <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <FileSpreadsheet className="text-blue-600" /> 工作日志数据分析
-          </h2>
-          {displayData && (
-             <button onClick={handleReset} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors shadow-sm">
-               <RefreshCw className="w-4 h-4" /> Reset Data
-             </button>
-          )}
-       </div>
-
+    <div className="h-full flex flex-col bg-gray-50 animate-in fade-in duration-500">
+       {/* Empty State Handling */}
        {allRecords.length === 0 && !loading ? (
-          <div className="max-w-xl mx-auto space-y-4 py-12">
-             <div className="text-center space-y-2">
-                <p className="text-gray-500">Upload standard ZenTao Excel exports to analyze weekly efforts.</p>
+          <div className="flex-1 flex flex-col items-center justify-center p-6">
+             <div className="max-w-xl w-full space-y-6">
+                <div className="text-center space-y-2">
+                   <h2 className="text-3xl font-bold text-gray-800 flex items-center justify-center gap-3">
+                     <FileSpreadsheet className="w-8 h-8 text-blue-600" /> 工作日志数据分析
+                   </h2>
+                   <p className="text-gray-500 text-lg">Upload standard ZenTao Excel exports to analyze weekly efforts.</p>
+                </div>
+                <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
+                    <UploadArea onFilesSelect={handleFilesProcess} isLoading={loading} />
+                    {error && <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200 text-sm flex items-start gap-2"><AlertCircle className="w-5 h-5 shrink-0" />{error}</div>}
+                </div>
              </div>
-             <UploadArea onFilesSelect={handleFilesProcess} isLoading={loading} />
-             {error && <div className="p-4 bg-red-50 text-red-700 rounded-lg border border-red-200 text-sm">{error}</div>}
           </div>
        ) : (
-         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-            <div className="lg:col-span-1 space-y-4">
-                 <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Dataset Info</h3>
-                    <div className="flex items-center gap-2 mb-4">
-                      <Layers className="w-5 h-5 text-blue-600" />
-                      <span className="text-2xl font-bold text-gray-900">{allRecords.length}</span>
-                      <span className="text-gray-500">Records</span>
+         <div className="flex h-full overflow-hidden">
+            {/* Sidebar - Fixed Left */}
+            <aside className="w-80 bg-white border-r border-gray-200 flex flex-col shrink-0 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
+                 <div className="p-6 space-y-6 overflow-y-auto h-full">
+                    <div>
+                        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2 mb-1">
+                            <FileSpreadsheet className="w-5 h-5 text-blue-600" /> Analysis
+                        </h2>
+                        <p className="text-xs text-gray-400">Work Log Data</p>
                     </div>
+
+                    <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Dataset Info</h3>
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                                <Layers className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <span className="block text-2xl font-bold text-gray-900 leading-none">{allRecords.length}</span>
+                                <span className="text-xs text-gray-500 font-medium">Total Records</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-bold text-gray-700">Import Data</h3>
+                        </div>
+                        <UploadArea onFilesSelect={handleFilesProcess} isLoading={loading} />
+                    </div>
+
+                    {displayData && (
+                        <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 rounded-xl transition-all">
+                            <RefreshCw className="w-4 h-4" /> Reset All Data
+                        </button>
+                    )}
                  </div>
-                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                    <p className="text-sm text-blue-800 mb-3 font-medium">Add more logs?</p>
-                    <UploadArea onFilesSelect={handleFilesProcess} isLoading={loading} />
-                 </div>
-            </div>
-            <div className="lg:col-span-3 space-y-6">
-                <DateFilter allDates={allAvailableDates} currentStart={startDate} currentEnd={endDate} onFilterChange={(s, e) => { setStartDate(s); setEndDate(e); }} />
-                {displayData && displayData.summary.length > 0 ? (
-                   <TimesheetTable data={displayData} />
-                ) : (
-                   <div className="text-center py-12 bg-white rounded-xl border border-gray-200 border-dashed text-gray-500">No records found for selected range.</div>
-                )}
-            </div>
+            </aside>
+
+            {/* Main Content Area */}
+            <main className="flex-1 flex flex-col h-full overflow-hidden bg-gray-50/50 relative">
+               <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                   <div className="flex items-center justify-between">
+                      <div>
+                          <h1 className="text-2xl font-bold text-gray-900">工作日志数据分析</h1>
+                          <p className="text-sm text-gray-500 mt-1">Weekly effort analysis and content breakdown</p>
+                      </div>
+                   </div>
+
+                   <DateFilter allDates={allAvailableDates} currentStart={startDate} currentEnd={endDate} onFilterChange={(s, e) => { setStartDate(s); setEndDate(e); }} />
+
+                   {displayData && displayData.summary.length > 0 ? (
+                      <TimesheetTable data={displayData} />
+                   ) : (
+                      <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-gray-200 border-dashed text-gray-400">
+                          <Calendar className="w-12 h-12 mb-4 opacity-20" />
+                          <p>No records found for the selected date range.</p>
+                      </div>
+                   )}
+               </div>
+            </main>
          </div>
        )}
     </div>

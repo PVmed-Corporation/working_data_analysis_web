@@ -64,7 +64,7 @@ const App: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 overflow-hidden">
         {currentView === 'worklog' && (
-           <div className="h-full overflow-y-auto p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+           <div className="h-full w-full">
              <WorkLogView />
            </div>
         )}
