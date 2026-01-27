@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { UploadCloud, Calendar, SlidersHorizontal, User, Clock, AlignLeft, RefreshCw, Layers, FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
+import { UploadCloud, Calendar, SlidersHorizontal, User, Clock, AlignLeft, RefreshCw, Layers, FileSpreadsheet, Loader2, AlertCircle, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { parseWorkLogBuffer, aggregateWorkLogs } from '../services/parsers';
 import { saveWorkLogs, getAllWorkLogs, clearWorkLogs } from '../services/db';
 import { WeeklyRecord } from '../types';
@@ -135,6 +135,7 @@ export const WorkLogView: React.FC = () => {
   const [endDate, setEndDate] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     // Load from IndexedDB on mount
@@ -225,47 +226,60 @@ export const WorkLogView: React.FC = () => {
        ) : (
          <div className="flex h-full overflow-hidden">
             {/* Sidebar - Fixed Left */}
-            <aside className="w-80 bg-white border-r border-gray-200 flex flex-col shrink-0 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
-                 <div className="p-6 space-y-6 overflow-y-auto h-full">
-                    <div>
-                        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2 mb-1">
-                            <FileSpreadsheet className="w-5 h-5 text-blue-600" /> Analysis
-                        </h2>
-                        <p className="text-xs text-gray-400">Work Log Data</p>
-                    </div>
+            <aside 
+              className={`bg-white border-r border-gray-200 flex flex-col shrink-0 z-10 transition-all duration-300 ease-in-out ${
+                isSidebarOpen ? 'w-80 translate-x-0 opacity-100' : 'w-0 -translate-x-full opacity-0 overflow-hidden'
+              }`}
+            >
+                 <div className="w-80 h-full flex flex-col">
+                     <div className="p-6 space-y-6 overflow-y-auto h-full">
+                        <div>
+                            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2 mb-1">
+                                <FileSpreadsheet className="w-5 h-5 text-blue-600" /> Analysis
+                            </h2>
+                            <p className="text-xs text-gray-400">Work Log Data</p>
+                        </div>
 
-                    <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
-                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Dataset Info</h3>
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                                <Layers className="w-6 h-6" />
-                            </div>
-                            <div>
-                                <span className="block text-2xl font-bold text-gray-900 leading-none">{allRecords.length}</span>
-                                <span className="text-xs text-gray-500 font-medium">Total Records</span>
+                        <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Dataset Info</h3>
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                                    <Layers className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <span className="block text-2xl font-bold text-gray-900 leading-none">{allRecords.length}</span>
+                                    <span className="text-xs text-gray-500 font-medium">Total Records</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-bold text-gray-700">Import Data</h3>
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-gray-700">Import Data</h3>
+                            </div>
+                            <UploadArea onFilesSelect={handleFilesProcess} isLoading={loading} />
                         </div>
-                        <UploadArea onFilesSelect={handleFilesProcess} isLoading={loading} />
-                    </div>
 
-                    {displayData && (
-                        <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 rounded-xl transition-all">
-                            <RefreshCw className="w-4 h-4" /> Reset All Data
-                        </button>
-                    )}
+                        {displayData && (
+                            <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 rounded-xl transition-all">
+                                <RefreshCw className="w-4 h-4" /> Reset All Data
+                            </button>
+                        )}
+                     </div>
                  </div>
             </aside>
 
             {/* Main Content Area */}
             <main className="flex-1 flex flex-col h-full overflow-hidden bg-gray-50/50 relative">
                <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                   <div className="flex items-center justify-between">
+                   <div className="flex items-center gap-4">
+                      <button
+                        onClick={() => setSidebarOpen(!isSidebarOpen)}
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                        title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+                      >
+                        {isSidebarOpen ? <PanelLeftClose className="w-6 h-6" /> : <PanelLeftOpen className="w-6 h-6" />}
+                      </button>
                       <div>
                           <h1 className="text-2xl font-bold text-gray-900">工作日志数据分析</h1>
                           <p className="text-sm text-gray-500 mt-1">Weekly effort analysis and content breakdown</p>

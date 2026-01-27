@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { LayoutGrid, Upload, FolderOpen, ChevronDown, ChevronRight, FileText, Trash2, Clock, Users, TrendingUp, Download, Calendar } from 'lucide-react';
+import { LayoutGrid, Upload, FolderOpen, ChevronDown, ChevronRight, FileText, Trash2, Clock, Users, TrendingUp, Download, Calendar, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LabelList, PieChart, Pie, Cell, Legend } from 'recharts';
 import { v4 as uuidv4 } from 'uuid';
 import { parseProjectProgressFile, parseFilename } from '../services/parsers';
@@ -27,13 +27,17 @@ const Sidebar: React.FC<{
   onUpload: (f: File) => void;
   onDeleteProject: (name: string) => void;
   onDeleteReport: (id: string) => void;
-}> = ({ groups, selectedId, onSelect, onUpload, onDeleteProject, onDeleteReport }) => {
+  isOpen: boolean;
+}> = ({ groups, selectedId, onSelect, onUpload, onDeleteProject, onDeleteReport, isOpen }) => {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggle = (name: string) => setExpanded(p => ({ ...p, [name]: !p[name] }));
   const fileInput = useRef<HTMLInputElement>(null);
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 p-4 flex flex-col gap-4 h-full">
+    <aside className={`bg-white border-r border-gray-200 flex flex-col shrink-0 transition-all duration-300 ease-in-out ${
+      isOpen ? 'w-64 translate-x-0 opacity-100' : 'w-0 -translate-x-full opacity-0 overflow-hidden'
+    }`}>
+      <div className="w-64 h-full flex flex-col p-4 gap-4">
        <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
           <button onClick={() => fileInput.current?.click()} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-lg font-medium transition-all shadow-sm">
              <Upload size={18} /> Upload Analysis
@@ -71,6 +75,7 @@ const Sidebar: React.FC<{
             </div>
           ))}
        </div>
+      </div>
     </aside>
   );
 };
@@ -167,6 +172,7 @@ export const ProjectProgressView: React.FC = () => {
   const [reports, setReports] = useState<ProjectReport[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
   useEffect(() => {
     getAllProjectReports().then(setReports);
@@ -221,8 +227,18 @@ export const ProjectProgressView: React.FC = () => {
 
   return (
     <div className="flex h-full min-h-[calc(100vh-6rem)]">
-      <Sidebar groups={projectGroups} selectedId={selectedId} onSelect={r => setSelectedId(r.id)} onUpload={handleUpload} onDeleteProject={handleDeleteProject} onDeleteReport={handleDeleteReport} />
+      <Sidebar groups={projectGroups} selectedId={selectedId} onSelect={r => setSelectedId(r.id)} onUpload={handleUpload} onDeleteProject={handleDeleteProject} onDeleteReport={handleDeleteReport} isOpen={isSidebarOpen} />
       <main className="flex-1 p-6 bg-slate-50 overflow-y-auto">
+        <div className="flex items-center gap-4 mb-4">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+          >
+            {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+          </button>
+        </div>
+        
         {isLoading && <div className="text-center text-indigo-600">Processing...</div>}
         {selectedReport ? (
            <div className="animate-in fade-in">

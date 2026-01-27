@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { UploadCloud, Calendar, Trash2, AlertCircle, BarChart3 } from 'lucide-react';
+import { UploadCloud, Calendar, Trash2, AlertCircle, BarChart3, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { parseCodeSubmissionFile } from '../services/parsers';
 import { saveCodeAnalysisReport, getAllCodeAnalysisReports, deleteCodeAnalysisReport } from '../services/db';
@@ -68,6 +68,7 @@ export const CodeSubmissionView: React.FC = () => {
   const [currentDate, setCurrentDate] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -116,34 +117,48 @@ export const CodeSubmissionView: React.FC = () => {
   return (
     <div className="flex h-full min-h-[calc(100vh-6rem)]">
       {/* Sidebar (In-page) */}
-      <aside className="w-64 bg-white border-r border-gray-200 p-4 flex flex-col gap-4">
-        <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-           <button onClick={() => fileInputRef.current?.click()} disabled={isLoading} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-lg font-medium transition-all shadow-sm">
-             {isLoading ? "Processing..." : <><UploadCloud size={18} /> Upload Analysis</>}
-           </button>
-           <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx,.xls" className="hidden" />
-           {error && <div className="mt-3 p-2 bg-red-50 text-red-600 text-xs rounded border border-red-100 flex gap-1"><AlertCircle size={14} className="shrink-0 mt-0.5" />{error}</div>}
-        </div>
-        
-        <div className="flex-1 overflow-y-auto">
-           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Report History</h3>
-           {sortedDates.length === 0 ? <div className="text-sm text-gray-400 text-center py-4">No history</div> : (
-             <div className="space-y-1">
-               {sortedDates.map(date => (
-                 <div key={date} className="group relative">
-                    <button onClick={() => setCurrentDate(date)} className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${currentDate === date ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}>
-                      <div className="flex items-center gap-2"><Calendar size={14} />{date}</div>
-                    </button>
-                    <button onClick={(e) => handleDeleteReport(date, e)} className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
-                 </div>
-               ))}
-             </div>
-           )}
+      <aside className={`bg-white border-r border-gray-200 flex flex-col shrink-0 transition-all duration-300 ease-in-out ${
+          isSidebarOpen ? 'w-64 translate-x-0 opacity-100' : 'w-0 -translate-x-full opacity-0 overflow-hidden'
+        }`}>
+        <div className="w-64 h-full flex flex-col p-4 gap-4">
+          <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+             <button onClick={() => fileInputRef.current?.click()} disabled={isLoading} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-lg font-medium transition-all shadow-sm">
+               {isLoading ? "Processing..." : <><UploadCloud size={18} /> Upload Analysis</>}
+             </button>
+             <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx,.xls" className="hidden" />
+             {error && <div className="mt-3 p-2 bg-red-50 text-red-600 text-xs rounded border border-red-100 flex gap-1"><AlertCircle size={14} className="shrink-0 mt-0.5" />{error}</div>}
+          </div>
+          
+          <div className="flex-1 overflow-y-auto">
+             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Report History</h3>
+             {sortedDates.length === 0 ? <div className="text-sm text-gray-400 text-center py-4">No history</div> : (
+               <div className="space-y-1">
+                 {sortedDates.map(date => (
+                   <div key={date} className="group relative">
+                      <button onClick={() => setCurrentDate(date)} className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${currentDate === date ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}>
+                        <div className="flex items-center gap-2"><Calendar size={14} />{date}</div>
+                      </button>
+                      <button onClick={(e) => handleDeleteReport(date, e)} className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
+                   </div>
+                 ))}
+               </div>
+             )}
+          </div>
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 p-6 overflow-y-auto bg-gray-50">
+        <div className="flex items-center gap-4 mb-4">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+          >
+            {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+          </button>
+        </div>
+
         {!activeReport ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-400">
              <BarChart3 size={48} className="mb-4 text-gray-300" />
