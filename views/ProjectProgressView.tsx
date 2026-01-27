@@ -178,13 +178,28 @@ export const ProjectProgressView: React.FC = () => {
   const handleUpload = async (file: File) => {
     const meta = parseFilename(file.name);
     if (!meta) { alert('Invalid filename. Use yyyy-mm-dd_ProjectName_analysis.xlsx'); return; }
+    
     setIsLoading(true);
     try {
        const parsed = await parseProjectProgressFile(file);
-       const newReport: ProjectReport = { id: uuidv4(), fileName: file.name, projectName: meta.projectName, date: meta.date, data: parsed };
+       
+       // Deduplication Logic: Check if duplicate exists based on ProjectName and Date
+       const existingReport = reports.find(r => r.projectName === meta.projectName && r.date === meta.date);
+       
+       // If exists, reuse the ID to overwrite; otherwise generate new UUID
+       const reportId = existingReport ? existingReport.id : uuidv4();
+       
+       const newReport: ProjectReport = { 
+         id: reportId, 
+         fileName: file.name, 
+         projectName: meta.projectName, 
+         date: meta.date, 
+         data: parsed 
+       };
+       
        await saveProjectReport(newReport);
        setReports(await getAllProjectReports());
-       setSelectedId(newReport.id);
+       setSelectedId(reportId);
     } catch (e: any) {
        alert(e.message);
     } finally {
