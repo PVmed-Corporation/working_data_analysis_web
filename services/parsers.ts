@@ -6,92 +6,154 @@ export const parseWorkLogBuffer = (buffer: ArrayBuffer): WeeklyRecord[] => {
   const workbook = XLSX.read(buffer, { type: 'array' });
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
+  
+  // Get all data as an array of arrays (Row 0 is index 0)
   const jsonData = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
-
   const records: WeeklyRecord[] = [];
-  let currentPerson = '';
 
-  // Simple heuristic: assuming specific column layout based on standard ZenTao export
-  // Or generic approach: Look for "Name" in col 0, "Date" in headers.
-  // Implementing a robust generic parser matching the "Weekly Analysis" requirement.
-  
-  // Note: The prompt's original code for App 1 had `parseExcelBuffer`. 
-  // I am reconstructing the likely logic for ZenTao format based on the prompt's `ParsedData` structure
-  // which implies mapping (Name, Date, Time, Content).
-  
-  // Finding header row
-  let headerRowIdx = 0;
-  for(let i=0; i<jsonData.length; i++) {
-     const row = jsonData[i];
-     if (row.some((cell: any) => typeof cell === 'string' && cell.toLowerCase().includes('date'))) {
-        headerRowIdx = i;
-        break;
-     }
-  }
+  if (jsonData.length < 2) return [];
 
-  // If strict format isn't guaranteed, we use a flattened approach often used in these apps:
-  // Iterate rows. If Col 0 has value, it's name (merged cell logic). 
-  // If not, use previous name.
-  
-  // Let's implement the logic implied by the prompt's App 1 `TimesheetTable`:
-  // It expects `summary` and `dates`. The parsing logic happens before aggregation.
-  // Re-implementing a robust version:
-  
-  const rawData = XLSX.utils.sheet_to_json(worksheet); 
-  // Assuming keys like "Account", "Date", "Consumed", "Task" are present or similar.
-  // Since I cannot see the exact input file, I will use a generic parser that looks for common fields.
-  
-  rawData.forEach((row: any) => {
-      const name = row['Realname'] || row['Name'] || row['姓名'] || row['User'] || 'Unknown';
-      const date = row['Date'] || row['日期'] || new Date().toISOString().split('T')[0];
-      const time = row['Consumed'] || row['Time'] || row['工时'] || row['消耗'] || '0';
-      const content = row['Task Name'] || row['Content'] || row['Work Content'] || row['任务'] || row['内容'] || '';
-      
-      records.push({
-          name,
-          date: String(date).trim(),
-          time: String(time),
-          content: String(content)
-      });
+  // --- Detection Strategy ---
+  // Check Row 0 for Date patterns (YYYY-MM-DD) to see if it matches the "Matrix" format
+  // Format: Row 0 has dates; Row 2+ has Name in Col 0 and data in subsequent columns.
+  const row0 = jsonData[0];
+  const isMatrixFormat = row0 && row0.some(cell => {
+      if (!cell) return false;
+      const s = String(cell).trim();
+      return /^\d{4}-\d{2}-\d{2}$/.test(s); // Simple ISO date check
   });
+
+  if (isMatrixFormat) {
+     // --- Matrix Parsing Logic (Crosstab) ---
+     // Row 0: Dates (merged, usually appear every 2 cols: Time, Content)
+     // Row 1: Sub-headers (Time, Content) - ignored for parsing, we rely on position
+     // Row 2+: Data
+     // Col 0: Name (merged vertically)
+     
+     let currentPerson = '';
+     const startRow = 2; // Data starts at Row 3 (index 2)
+     
+     for (let r = startRow; r < jsonData.length; r++) {
+         const row = jsonData[r];
+         if (!row || row.length === 0) continue;
+
+         // Handle Name (Col 0) - Merged Cell Logic
+         // If a name exists, update currentPerson. If empty, use existing currentPerson.
+         const rawName = row[0];
+         if (rawName && String(rawName).trim()) {
+             currentPerson = String(rawName).trim();
+         }
+         
+         // If we still don't have a person (e.g. bad first row), skip
+         if (!currentPerson) continue;
+
+         // Iterate Columns to find Date groups
+         // We scan Row 0 again to find where each date starts
+         for (let c = 1; c < row0.length; c++) {
+             const dateVal = row0[c];
+             
+             // If we find a date in Row 0 at column `c`, it implies:
+             // Col `c` is Time (usually)
+             // Col `c+1` is Content (usually)
+             if (dateVal && /^\d{4}-\d{2}-\d{2}$/.test(String(dateVal).trim())) {
+                 const dateStr = String(dateVal).trim();
+                 
+                 // Extract values from the current data row `r`
+                 const timeVal = row[c];
+                 const contentVal = row[c + 1];
+
+                 // Only add a record if there is actual data (time or content)
+                 const hasTime = timeVal !== undefined && timeVal !== null && String(timeVal).trim() !== '';
+                 const hasContent = contentVal !== undefined && contentVal !== null && String(contentVal).trim() !== '';
+
+                 if (hasTime || hasContent) {
+                     records.push({
+                         name: currentPerson,
+                         date: dateStr,
+                         time: hasTime ? String(timeVal) : '0',
+                         content: hasContent ? String(contentVal) : ''
+                     });
+                 }
+             }
+         }
+     }
+  } else {
+      // --- Fallback to Standard List Parser (ZenTao Export) ---
+      // Scans for a header row containing "Date" and "Name"/"Realname"
+      let headerRowIdx = -1;
+      for(let i=0; i<Math.min(jsonData.length, 20); i++) {
+         const row = jsonData[i];
+         if (!row || !Array.isArray(row)) continue;
+         const strRow = row.map(c => String(c || '').toLowerCase());
+         if (strRow.some(s => s.includes('date') || s.includes('日期'))) {
+            headerRowIdx = i;
+            break;
+         }
+      }
+
+      if (headerRowIdx !== -1) {
+          // Re-parse using sheet_to_json with object mapping based on the found header row
+          const rawData = XLSX.utils.sheet_to_json(worksheet, { range: headerRowIdx }); 
+          rawData.forEach((row: any) => {
+              const name = row['Realname'] || row['Name'] || row['姓名'] || row['User'] || 'Unknown';
+              const date = row['Date'] || row['日期'];
+              const time = row['Consumed'] || row['Time'] || row['工时'] || row['消耗'] || '0';
+              const content = row['Task Name'] || row['Content'] || row['Work Content'] || row['任务'] || row['内容'] || '';
+              
+              if (name !== 'Unknown' && date) {
+                  records.push({
+                      name,
+                      date: String(date).trim(),
+                      time: String(time),
+                      content: String(content)
+                  });
+              }
+          });
+      }
+  }
 
   return records;
 };
 
 export const aggregateWorkLogs = (records: WeeklyRecord[]) => {
   const datesSet = new Set<string>();
-  const personMap: Record<string, Record<string, { time: number, content: string[] }>> = {};
+  // Change: Store array of entries instead of pre-aggregating
+  const personMap: Record<string, Record<string, { time: string, content: string }[]>> = {};
 
   records.forEach(r => {
     datesSet.add(r.date);
     if (!personMap[r.name]) personMap[r.name] = {};
-    if (!personMap[r.name][r.date]) personMap[r.name][r.date] = { time: 0, content: [] };
+    if (!personMap[r.name][r.date]) personMap[r.name][r.date] = [];
     
-    personMap[r.name][r.date].time += parseFloat(r.time) || 0;
-    if (r.content) personMap[r.name][r.date].content.push(r.content);
+    personMap[r.name][r.date].push({
+        time: r.time,
+        content: r.content
+    });
   });
 
   const dates = Array.from(datesSet).sort();
   const summary = Object.keys(personMap).map(name => {
     let totalHours = 0;
-    let maxRows = 1;
+    let maxRows = 0;
     const rowData: Record<string, { time: string, content: string }[]> = {};
 
     dates.forEach(date => {
-        const entry = personMap[name][date];
-        if (entry) {
-            totalHours += entry.time;
-            // For display purposes, we might just join content, or keep distinct.
-            // The UI expects an array of rows if content is split. 
-            // Let's simplify: join content with newline.
-            rowData[date] = [{
-                time: entry.time.toFixed(1),
-                content: entry.content.join('; ')
-            }];
-        } else {
-            rowData[date] = [];
+        const entries = personMap[name][date] || [];
+        rowData[date] = entries;
+
+        // Determine the maximum rows needed for this person based on the day with most tasks
+        if (entries.length > maxRows) {
+            maxRows = entries.length;
         }
+
+        // Calculate total hours
+        entries.forEach(e => {
+            totalHours += parseFloat(e.time) || 0;
+        });
     });
+
+    // Ensure at least 1 row to display the person
+    if (maxRows === 0) maxRows = 1;
 
     return {
         name,

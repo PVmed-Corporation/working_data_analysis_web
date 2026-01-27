@@ -70,18 +70,18 @@ const TimesheetTable: React.FC<{ data: any }> = ({ data }) => {
   return (
     <div className="w-full overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-max border-collapse text-sm table-fixed">
+        <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
               <th className="sticky left-0 z-20 bg-gray-50 p-4 text-left font-semibold text-gray-700 border-r border-gray-200 w-[120px]" rowSpan={2}><div className="flex items-center gap-2"><User className="w-4 h-4 text-gray-400" />Name</div></th>
-              {dates.map((date: string) => <th key={date} colSpan={2} className="p-3 text-center font-semibold text-gray-700 border-r border-gray-200 last:border-r-0 bg-blue-50/50">{date}</th>)}
+              {dates.map((date: string) => <th key={date} colSpan={2} className="p-3 text-center font-semibold text-gray-700 border-r border-gray-200 last:border-r-0 bg-blue-50/50 whitespace-nowrap">{date}</th>)}
               <th className="sticky right-0 z-20 bg-gray-50 p-4 text-center font-semibold text-gray-900 border-l border-gray-200 w-[100px]" rowSpan={2}>Weekly Total</th>
             </tr>
             <tr className="bg-gray-50 border-b border-gray-200">
               {dates.map((date: string) => (
                 <React.Fragment key={`${date}-sub`}>
-                  <th className="p-2 text-center text-xs font-medium text-gray-500 w-[60px] border-r border-gray-100"><div className="flex items-center justify-center gap-1"><Clock className="w-3 h-3" />Hrs</div></th>
-                  <th className="p-2 text-left text-xs font-medium text-gray-500 min-w-[200px] border-r border-gray-200"><div className="flex items-center gap-1"><AlignLeft className="w-3 h-3" />Content</div></th>
+                  <th className="p-2 text-center text-xs font-medium text-gray-500 border-r border-gray-100 whitespace-nowrap"><div className="flex items-center justify-center gap-1"><Clock className="w-3 h-3" />Hrs</div></th>
+                  <th className="p-2 text-left text-xs font-medium text-gray-500 border-r border-gray-200 min-w-[200px]"><div className="flex items-center gap-1"><AlignLeft className="w-3 h-3" />Content</div></th>
                 </React.Fragment>
               ))}
             </tr>

@@ -24,7 +24,6 @@ const App: React.FC = () => {
             <div className="flex items-center">
               <div className="flex-shrink-0 flex items-center gap-2 text-indigo-600 font-bold text-xl mr-8">
                 <Layout className="w-6 h-6" />
-                <span>ZenTao Analytics</span>
               </div>
               <div className="hidden sm:flex sm:space-x-4">
                 {navItems.map((item) => (

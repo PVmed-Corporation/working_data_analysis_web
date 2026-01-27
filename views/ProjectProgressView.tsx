@@ -33,35 +33,37 @@ const Sidebar: React.FC<{
   const fileInput = useRef<HTMLInputElement>(null);
 
   return (
-    <aside className="w-64 bg-slate-900 text-slate-100 flex flex-col h-full border-r border-slate-800">
-       <div className="p-4 border-b border-slate-800">
-          <button onClick={() => fileInput.current?.click()} className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 py-2 px-4 rounded-lg transition-colors text-sm font-medium">
-             <Upload size={16} /> Upload Analysis
+    <aside className="w-64 bg-white border-r border-gray-200 p-4 flex flex-col gap-4 h-full">
+       <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+          <button onClick={() => fileInput.current?.click()} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-lg font-medium transition-all shadow-sm">
+             <Upload size={18} /> Upload Analysis
           </button>
           <input type="file" ref={fileInput} className="hidden" accept=".xlsx" onChange={e => { if(e.target.files?.[0]) { onUpload(e.target.files[0]); e.target.value=''; } }} />
-          <p className="text-[10px] text-slate-500 mt-2 text-center">Format: yyyy-mm-dd_ProjectName_analysis.xlsx</p>
+          <p className="text-[10px] text-gray-500 mt-2 text-center">Format: yyyy-mm-dd_ProjectName_analysis.xlsx</p>
        </div>
-       <div className="flex-1 overflow-y-auto p-3 space-y-1">
+       
+       <div className="flex-1 overflow-y-auto space-y-1">
+          {groups.length === 0 && <div className="text-sm text-gray-400 text-center py-4">No projects</div>}
           {groups.map(group => (
             <div key={group.projectName}>
-              <div onClick={() => toggle(group.projectName)} className="flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md hover:bg-slate-800 cursor-pointer text-slate-300 hover:text-white group/item">
+              <div onClick={() => toggle(group.projectName)} className="flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md hover:bg-gray-50 cursor-pointer text-gray-700 group/item transition-colors">
                  <div className="flex items-center gap-2 overflow-hidden">
-                    <FolderOpen size={16} className="text-indigo-400 shrink-0" />
+                    <FolderOpen size={16} className="text-blue-500 shrink-0" />
                     <span className="truncate">{group.projectName}</span>
                  </div>
-                 <div className="flex items-center gap-1">
-                    <button onClick={(e) => { e.stopPropagation(); if(confirm('Delete project?')) onDeleteProject(group.projectName); }} className="p-1 opacity-0 group-hover/item:opacity-100 hover:text-red-400"><Trash2 size={14} /></button>
+                 <div className="flex items-center gap-1 text-gray-400">
+                    <button onClick={(e) => { e.stopPropagation(); if(confirm('Delete project?')) onDeleteProject(group.projectName); }} className="p-1 opacity-0 group-hover/item:opacity-100 hover:text-red-500 transition-opacity"><Trash2 size={14} /></button>
                     {expanded[group.projectName] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                  </div>
               </div>
               {(expanded[group.projectName] || group.reports.some(r => r.id === selectedId)) && (
-                 <div className="ml-4 pl-2 border-l border-slate-700 mt-1 space-y-0.5">
+                 <div className="ml-3 pl-3 border-l border-gray-200 mt-1 space-y-1">
                     {group.reports.map(report => (
                        <div key={report.id} className="group/report relative flex items-center">
-                          <button onClick={() => onSelect(report)} className={`w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md ${selectedId === report.id ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:bg-slate-800'}`}>
+                          <button onClick={() => onSelect(report)} className={`w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md transition-colors ${selectedId === report.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}>
                              <FileText size={12} /> {report.date}
                           </button>
-                          <button onClick={(e) => { e.stopPropagation(); if(confirm('Delete report?')) onDeleteReport(report.id); }} className="absolute right-1 opacity-0 group-hover/report:opacity-100 hover:text-red-400"><Trash2 size={12} /></button>
+                          <button onClick={(e) => { e.stopPropagation(); if(confirm('Delete report?')) onDeleteReport(report.id); }} className="absolute right-1 opacity-0 group-hover/report:opacity-100 hover:text-red-500 text-gray-400 transition-opacity"><Trash2 size={12} /></button>
                        </div>
                     ))}
                  </div>
@@ -81,23 +83,42 @@ const Charts: React.FC<{ data: ParsedProjectData; projectName: string }> = ({ da
      <div className="space-y-6">
         {/* Top Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between h-full">
               <div><p className="text-slate-500 text-sm">Total Hours</p><p className="text-2xl font-bold text-slate-800">{data.totalTime.toFixed(1)}</p></div>
               <div className="p-3 bg-blue-50 rounded-full"><Clock className="text-blue-500" /></div>
            </div>
-           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between h-full">
               <div><p className="text-slate-500 text-sm">Members</p><p className="text-2xl font-bold text-slate-800">{data.summary.length}</p></div>
               <div className="p-3 bg-indigo-50 rounded-full"><Users className="text-indigo-500" /></div>
            </div>
            {/* Pie Chart Mini */}
-           <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm h-32 flex items-center">
+           <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm h-48 flex items-center">
                <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                     <Pie data={data.statusDistribution} cx="50%" cy="50%" innerRadius={25} outerRadius={50} dataKey="value" paddingAngle={5}>
+                     <Pie 
+                        data={data.statusDistribution} 
+                        cx="50%" 
+                        cy="50%" 
+                        innerRadius={40} 
+                        outerRadius={70} 
+                        dataKey="value" 
+                        paddingAngle={5}
+                        labelLine={false}
+                        label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+                          const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                          const x = cx + radius * Math.cos(-midAngle * (Math.PI / 180));
+                          const y = cy + radius * Math.sin(-midAngle * (Math.PI / 180));
+                          return percent > 0 ? (
+                            <text x={x} y={y} fill="#64748b" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
+                              {`${(percent * 100).toFixed(0)}%`}
+                            </text>
+                          ) : null;
+                        }}
+                     >
                         {data.statusDistribution.map((entry, index) => <Cell key={`cell-${index}`} fill={(PIE_COLORS as any)[entry.name] || '#ccc'} strokeWidth={0} />)}
                      </Pie>
                      <RechartsTooltip />
-                     <Legend layout="vertical" align="right" verticalAlign="middle" iconSize={8} wrapperStyle={{fontSize: '10px'}} />
+                     <Legend layout="vertical" align="right" verticalAlign="middle" iconSize={8} wrapperStyle={{fontSize: '11px', right: 0}} />
                   </PieChart>
                </ResponsiveContainer>
            </div>
@@ -186,7 +207,7 @@ export const ProjectProgressView: React.FC = () => {
   return (
     <div className="flex h-full min-h-[calc(100vh-6rem)]">
       <Sidebar groups={projectGroups} selectedId={selectedId} onSelect={r => setSelectedId(r.id)} onUpload={handleUpload} onDeleteProject={handleDeleteProject} onDeleteReport={handleDeleteReport} />
-      <main className="flex-1 p-8 bg-slate-50 overflow-y-auto">
+      <main className="flex-1 p-6 bg-slate-50 overflow-y-auto">
         {isLoading && <div className="text-center text-indigo-600">Processing...</div>}
         {selectedReport ? (
            <div className="animate-in fade-in">
