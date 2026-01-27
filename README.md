@@ -31,14 +31,12 @@
 
 为了确保系统能够准确解析日期和项目信息，请在上传文件前严格遵循以下命名规则：
 
-### 1. 项目进度文件 (Project Files)
-用于“项目进度数据分析”模块。系统会解析文件名中的日期和项目名称。
+### 1. 项目进度文件 
 * **格式：** `yyyy-mm-dd_项目名称_analysis.xlsx`
 * **示例：**
     * `2025-11-17_iRT Ferret SP14_analysis.xlsx`
 
-### 2. 代码分析文件 (Code Analysis Files)
-用于“代码提交数据分析”模块。系统会从文件名中提取报告日期。
+### 2. 代码分析文件 
 * **格式：** `code_analysis_yyyy-mm-dd.xlsx`
 * **示例：**
     * `code_analysis_2025-11-17.xlsx`
@@ -50,22 +48,22 @@
 
 ## 🛠️ 本地运行 
 
-**前置要求 (Prerequisites):**
+**前置要求 :**
 * Node.js 
 * npm
 
 **安装与启动步骤:**
 
-1.  **安装依赖 (Install dependencies):**
+1.  **安装依赖 :**
     ```bash
     npm install
     ```
 
 
-2.  **启动开发服务器 (Run the app):**
+2.  **启动网站 :**
     ```bash
     npm run dev
     ```
 
-3.  **访问应用:**
+3.  **访问应用 :**
     打开浏览器访问控制台输出的地址（ `http://localhost:3000`）。
