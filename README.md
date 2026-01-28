@@ -2,7 +2,7 @@
   <h1 align="center">Digital Dashboard </h1>
 
   <p align="center">
-    一个基于 React 和 Vite 构建的综合数据分析仪表盘，用于可视化团队的工作日志、代码提交情况及项目进度。数据通过本地 IndexedDB 进行持久化存储。
+    一个基于 React 和 Vite 构建的综合数据分析仪表盘，用于可视化团队的工作日志、代码提交情况及项目进度。数据通过后端服务器存储在 SQLite 数据库中，支持跨设备访问。
   </p>
 </div>
 
@@ -56,14 +56,46 @@
 
 1.  **安装依赖 :**
     ```bash
+    # 安装前端依赖
     npm install
+    
+    # 安装后端依赖
+    cd server
+    npm install
+    cd ..
     ```
 
 
-2.  **启动网站 :**
+2.  **启动应用 :**
+    
+    **选项 A: 同时启动前后端（推荐）**
     ```bash
+    npm run dev:all
+    ```
+    
+    **选项 B: 分别启动**
+    ```bash
+    # 终端 1: 启动后端服务器
+    npm run dev:server
+    
+    # 终端 2: 启动前端开发服务器
     npm run dev
     ```
 
 3.  **访问应用 :**
-    打开浏览器访问控制台输出的地址（ `http://localhost:3000`）。
+    - 前端：打开浏览器访问 `http://localhost:3000`
+    - 后端 API：`http://localhost:3001/api/health`
+
+## 🗄️ 数据存储
+
+应用使用以下架构：
+- **前端**: React + Vite (端口 3000)
+- **后端**: Express.js (端口 3001)
+- **数据库**: SQLite (`database/analytics.db`)
+
+所有数据存储在后端数据库中，支持多设备访问同一份数据。
+
+## 📤 导出功能
+
+使用顶部的 "Export Dashboard" 按钮可以将所有数据导出为 Excel 文件，方便备份和离线查看。
+

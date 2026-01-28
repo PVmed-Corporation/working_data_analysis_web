@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "cd server && npm run dev",
+    "dev:all": "start cmd /k \"cd server && npm run dev\" && npm run dev",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "idb": "^8.0.3",
     "lucide-react": "^0.563.0",
     "recharts": "^3.7.0",
     "uuid": "^13.0.0",
