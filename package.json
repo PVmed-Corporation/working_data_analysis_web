@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:server": "cd server && npm run dev",
-    "dev:all": "start cmd /k \"cd server && npm run dev\" && npm run dev",
+    "dev:all": "concurrently \"npm run dev:server\" \"npm run dev\"",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -21,6 +21,7 @@
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "concurrently": "^9.1.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

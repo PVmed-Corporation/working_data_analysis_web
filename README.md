@@ -68,10 +68,11 @@
 
 2.  **启动应用 :**
     
-    **选项 A: 同时启动前后端（推荐）**
+    **选项 A: 同时启动前后端（推荐，跨平台兼容）**
     ```bash
     npm run dev:all
     ```
+    > 使用 `concurrently` 同时启动前后端，支持 Windows、Linux 和 macOS。
     
     **选项 B: 分别启动**
     ```bash
