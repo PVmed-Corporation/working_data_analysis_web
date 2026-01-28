@@ -31,7 +31,7 @@ export interface WeeklyReport {
   analysis: AnalysisRow[];
   projects: ProjectStat[];
   timestamp: number;
-  rawSheets?: Record<string, any[][]>; // Added raw data storage
+  rawData?: Record<string, any[][]>; // Added raw data storage
 }
 
 export type DataStore = Record<string, WeeklyReport>;
@@ -57,6 +57,7 @@ export interface ParsedProjectData {
   totalTime: number;
   statusDistribution: { name: string; value: number }[];
   memberTimeStats: { name: string; value: number }[];
+  rawData?: Record<string, any[][]>; // Added raw data storage
 }
 
 export interface ProjectReport {
@@ -65,7 +66,6 @@ export interface ProjectReport {
   projectName: string;
   date: string;
   data: ParsedProjectData;
-  rawSheets?: Record<string, any[][]>; // Added raw data storage
 }
 
 export interface ProjectGroup {

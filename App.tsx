@@ -2,18 +2,38 @@ import React, { useState } from 'react';
 import { WorkLogView } from './views/WorkLogView';
 import { CodeSubmissionView } from './views/CodeSubmissionView';
 import { ProjectProgressView } from './views/ProjectProgressView';
-import { FileSpreadsheet, GitCommit, BarChart, Layout } from 'lucide-react';
+import { FileSpreadsheet, GitCommit, BarChart, Layout, Download, Loader2 } from 'lucide-react';
+import { getAllWorkLogs, getAllCodeAnalysisReports, getAllProjectReports } from './services/db';
+import { exportFullDashboard } from './services/exportService';
 
 type ViewType = 'worklog' | 'code' | 'project';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('worklog');
+  const [isExporting, setIsExporting] = useState(false);
 
   const navItems: { id: ViewType; label: string; icon: React.ElementType }[] = [
     { id: 'worklog', label: '工作日志数据分析', icon: FileSpreadsheet },
     { id: 'code', label: '代码提交数据分析', icon: GitCommit },
     { id: 'project', label: '项目进度数据分析', icon: BarChart },
   ];
+
+  const handleGlobalExport = async () => {
+    setIsExporting(true);
+    try {
+      const [workLogs, codeReports, projectReports] = await Promise.all([
+        getAllWorkLogs(),
+        getAllCodeAnalysisReports(),
+        getAllProjectReports()
+      ]);
+      exportFullDashboard(workLogs, codeReports, projectReports);
+    } catch (error) {
+      console.error("Export failed:", error);
+      alert("Failed to export dashboard data.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
@@ -41,6 +61,17 @@ const App: React.FC = () => {
                   </button>
                 ))}
               </div>
+            </div>
+            
+            <div className="flex items-center">
+               <button 
+                 onClick={handleGlobalExport} 
+                 disabled={isExporting}
+                 className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+               >
+                  {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  <span className="hidden sm:inline">Export Dashboard</span>
+               </button>
             </div>
           </div>
         </div>

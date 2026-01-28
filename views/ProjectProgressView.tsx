@@ -1,12 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { LayoutGrid, FolderOpen, ChevronDown, ChevronRight, FileText, Trash2, Clock, Users, Calendar, PanelLeftClose, PanelLeftOpen, AlertCircle, Table, BarChart as ChartIcon } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { LayoutGrid, Upload, FolderOpen, ChevronDown, ChevronRight, FileText, Trash2, Clock, Users, Calendar, PanelLeftClose, PanelLeftOpen, BarChart as BarChartIcon } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LabelList, PieChart, Pie, Cell, Legend } from 'recharts';
 import { v4 as uuidv4 } from 'uuid';
 import { parseProjectProgressFile, parseFilename } from '../services/parsers';
 import { saveProjectReport, getAllProjectReports, deleteProjectReport, deleteProjectByName } from '../services/db';
 import { ProjectReport, ProjectGroup, ParsedProjectData } from '../types';
-import { UploadArea } from '../components/UploadArea';
-import { RawDataViewer } from '../components/RawDataViewer';
 
 // --- Utils ---
 const groupReportsByProject = (reports: ProjectReport[]): ProjectGroup[] => {
@@ -21,7 +19,71 @@ const groupReportsByProject = (reports: ProjectReport[]): ProjectGroup[] => {
   })).sort((a, b) => a.projectName.localeCompare(b.projectName));
 };
 
+// Helper to generate column labels (A, B, C...)
+const getColLabel = (index: number) => {
+  let label = '';
+  index++;
+  while (index > 0) {
+    const rem = (index - 1) % 26;
+    label = String.fromCharCode(65 + rem) + label;
+    index = Math.floor((index - 1) / 26);
+  }
+  return label;
+};
+
 // --- Components ---
+const RawDataViewer: React.FC<{ data: Record<string, any[][]> }> = ({ data }) => {
+  const sheets = Object.keys(data);
+  const [activeSheet, setActiveSheet] = useState(sheets[0]);
+  const sheetData = data[activeSheet] || [];
+  
+  // Calculate max columns to normalize grid
+  const maxCols = sheetData.reduce((acc, row) => Math.max(acc, row ? row.length : 0), 0);
+
+  return (
+    <div className="flex flex-col h-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="flex gap-2 p-3 bg-gray-50 border-b border-gray-200 overflow-x-auto">
+        {sheets.map(sheet => (
+           <button 
+             key={sheet}
+             onClick={() => setActiveSheet(sheet)}
+             className={`px-4 py-2 text-sm rounded-lg whitespace-nowrap transition-colors ${activeSheet === sheet ? 'bg-white text-indigo-700 font-semibold shadow-sm ring-1 ring-gray-200' : 'text-gray-600 hover:bg-white hover:text-gray-900'}`}
+           >
+             {sheet}
+           </button>
+        ))}
+      </div>
+      <div className="flex-1 overflow-auto relative">
+         <table className="w-full text-sm text-left text-gray-600 border-collapse">
+            <thead className="bg-gray-50 text-gray-700 font-semibold sticky top-0 z-10 shadow-sm">
+              <tr>
+                 <th className="p-3 border-b border-r border-gray-200 bg-gray-50 w-12 text-center text-xs text-gray-400 font-mono">#</th>
+                 {Array.from({length: maxCols}).map((_, i) => (
+                    <th key={i} className="p-3 border-b border-r border-gray-200 min-w-[150px] whitespace-nowrap">
+                       {getColLabel(i)}
+                    </th>
+                 ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sheetData.map((row, rowIndex) => (
+                 <tr key={rowIndex} className="hover:bg-blue-50/30 border-b border-gray-100 last:border-0 bg-white">
+                    <td className="p-2 border-r border-gray-100 bg-gray-50/50 text-xs text-center text-gray-400 font-mono select-none sticky left-0 align-top">{rowIndex + 1}</td>
+                    {Array.from({length: maxCols}).map((_, colIndex) => (
+                       <td key={colIndex} className="p-2 border-r border-gray-100 whitespace-pre-wrap break-words min-w-[150px] align-top">
+                          {row && row[colIndex] !== undefined && row[colIndex] !== null ? String(row[colIndex]) : ''}
+                       </td>
+                    ))}
+                 </tr>
+              ))}
+            </tbody>
+         </table>
+         {sheetData.length === 0 && <div className="p-8 text-center text-gray-400">Empty Sheet</div>}
+      </div>
+    </div>
+  );
+};
+
 const Sidebar: React.FC<{
   groups: ProjectGroup[];
   selectedId: string | null;
@@ -30,11 +92,10 @@ const Sidebar: React.FC<{
   onDeleteProject: (name: string) => void;
   onDeleteReport: (id: string) => void;
   isOpen: boolean;
-  isLoading: boolean;
-  error: string | null;
-}> = ({ groups, selectedId, onSelect, onUpload, onDeleteProject, onDeleteReport, isOpen, isLoading, error }) => {
+}> = ({ groups, selectedId, onSelect, onUpload, onDeleteProject, onDeleteReport, isOpen }) => {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggle = (name: string) => setExpanded(p => ({ ...p, [name]: !p[name] }));
+  const fileInput = useRef<HTMLInputElement>(null);
 
   return (
     <aside className={`bg-white border-r border-gray-200 flex flex-col shrink-0 transition-all duration-300 ease-in-out ${
@@ -42,8 +103,11 @@ const Sidebar: React.FC<{
     }`}>
       <div className="w-64 h-full flex flex-col p-4 gap-4">
        <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-          <UploadArea onFilesSelect={onUpload} isLoading={isLoading} title="Upload Analysis" description="Format: yyyy-mm-dd_ProjectName_analysis.xlsx" compact={true} />
-          {error && <div className="mt-3 p-2 bg-red-50 text-red-600 text-xs rounded border border-red-100 flex gap-1 overflow-auto max-h-20"><AlertCircle size={14} className="shrink-0 mt-0.5" />{error}</div>}
+          <button onClick={() => fileInput.current?.click()} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-lg font-medium transition-all shadow-sm">
+             <Upload size={18} /> Upload Analysis
+          </button>
+          <input type="file" ref={fileInput} className="hidden" accept=".xlsx" multiple onChange={e => { if(e.target.files && e.target.files.length > 0) { onUpload(Array.from(e.target.files)); e.target.value=''; } }} />
+          <p className="text-[10px] text-gray-500 mt-2 text-center">Format: yyyy-mm-dd_ProjectName_analysis.xlsx</p>
        </div>
        
        <div className="flex-1 overflow-y-auto space-y-1">
@@ -172,9 +236,8 @@ export const ProjectProgressView: React.FC = () => {
   const [reports, setReports] = useState<ProjectReport[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [viewMode, setViewMode] = useState<'chart' | 'raw'>('chart');
+  const [showRaw, setShowRaw] = useState(false);
   
   useEffect(() => {
     getAllProjectReports().then(setReports);
@@ -182,61 +245,51 @@ export const ProjectProgressView: React.FC = () => {
 
   const projectGroups = useMemo(() => groupReportsByProject(reports), [reports]);
   const selectedReport = useMemo(() => reports.find(r => r.id === selectedId), [reports, selectedId]);
+  const hasData = reports.length > 0;
 
   const handleUpload = async (files: File[]) => {
     setIsLoading(true);
-    setError(null);
     let successCount = 0;
     const errors: string[] = [];
-
-    // Pre-fetch reports to deduplicate correctly across multiple files in the same batch
-    // (though real-time update in loop is safer if many files overwrite each other)
-    let currentReports = [...reports];
-
-    for (const file of files) {
-      const meta = parseFilename(file.name);
-      if (!meta) {
-        errors.push(`${file.name}: Invalid filename format`);
-        continue;
-      }
-      
-      try {
-         const parsed = await parseProjectProgressFile(file);
-         
-         const existingReport = currentReports.find(r => r.projectName === meta.projectName && r.date === meta.date);
-         const reportId = existingReport ? existingReport.id : uuidv4();
-         
-         const newReport: ProjectReport = { 
-           id: reportId, 
-           fileName: file.name, 
-           projectName: meta.projectName, 
-           date: meta.date, 
-           data: parsed,
-           rawSheets: parsed.rawSheets
-         };
-         
-         await saveProjectReport(newReport);
-         
-         // Update local list to handle next iteration correctly if overwriting
-         const idx = currentReports.findIndex(r => r.id === reportId);
-         if (idx >= 0) currentReports[idx] = newReport;
-         else currentReports.push(newReport);
-
-         successCount++;
-         // If this is the only one (or last successful one), select it
-         if (files.length === 1 || successCount === 1) {
-            setSelectedId(reportId);
-         }
-      } catch (e: any) {
-         errors.push(`${file.name}: ${e.message}`);
-      }
+    
+    try {
+        for (const file of files) {
+            const meta = parseFilename(file.name);
+            if (!meta) { 
+                errors.push(`${file.name}: Invalid filename (use yyyy-mm-dd_ProjectName_analysis.xlsx)`);
+                continue; 
+            }
+            
+            try {
+                const parsed = await parseProjectProgressFile(file);
+                const allCurrentReports = await getAllProjectReports();
+                const existingReport = allCurrentReports.find(r => r.projectName === meta.projectName && r.date === meta.date);
+                
+                const reportId = existingReport ? existingReport.id : uuidv4();
+                
+                const newReport: ProjectReport = { 
+                    id: reportId, 
+                    fileName: file.name, 
+                    projectName: meta.projectName, 
+                    date: meta.date, 
+                    data: parsed 
+                };
+                
+                await saveProjectReport(newReport);
+                successCount++;
+            } catch (e: any) {
+                errors.push(`${file.name}: ${e.message}`);
+            }
+        }
+        
+        setReports(await getAllProjectReports());
+        
+        if (errors.length > 0) {
+            alert(`Uploaded ${successCount}/${files.length}. Errors:\n${errors.join('\n')}`);
+        }
+    } finally {
+       setIsLoading(false);
     }
-
-    setReports(await getAllProjectReports());
-    if (errors.length > 0) {
-      setError(errors.join(' | '));
-    }
-    setIsLoading(false);
   };
 
   const handleDeleteProject = async (name: string) => {
@@ -253,64 +306,47 @@ export const ProjectProgressView: React.FC = () => {
 
   return (
     <div className="flex h-full min-h-[calc(100vh-6rem)]">
-      <Sidebar groups={projectGroups} selectedId={selectedId} onSelect={r => setSelectedId(r.id)} onUpload={handleUpload} onDeleteProject={handleDeleteProject} onDeleteReport={handleDeleteReport} isOpen={isSidebarOpen} isLoading={isLoading} error={error} />
-      <main className="flex-1 p-6 bg-slate-50 overflow-y-auto flex flex-col">
-        <div className="flex items-center gap-4 mb-4 justify-between shrink-0">
-          <div className="flex items-center gap-4">
-              <button
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-              >
+      <Sidebar groups={projectGroups} selectedId={selectedId} onSelect={(r) => { setSelectedId(r.id); setShowRaw(false); }} onUpload={handleUpload} onDeleteProject={handleDeleteProject} onDeleteReport={handleDeleteReport} isOpen={isSidebarOpen} />
+      <main className="flex-1 p-6 bg-slate-50 overflow-y-auto relative">
+        <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4">
+              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
                 {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
               </button>
-              {selectedReport && (
-               <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-sm">
-                  <button 
-                    onClick={() => setViewMode('chart')}
-                    className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-all ${viewMode === 'chart' ? 'bg-indigo-50 text-indigo-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
-                  >
-                     <ChartIcon size={16} /> Charts
-                  </button>
-                  <button 
-                    onClick={() => setViewMode('raw')}
-                    className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-all ${viewMode === 'raw' ? 'bg-indigo-50 text-indigo-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
-                  >
-                     <Table size={16} /> Raw Data
-                  </button>
-               </div>
-            )}
-          </div>
-        </div>
-        
-        {isLoading && !selectedReport && <div className="text-center text-indigo-600 mt-20">Processing...</div>}
-        {selectedReport ? (
-           <div className="flex-1 flex flex-col min-h-0 animate-in fade-in">
-              <header className="mb-8 flex justify-between items-center shrink-0">
-                 <div>
-                    <h2 className="text-2xl font-bold text-slate-800">{selectedReport.projectName}</h2>
-                    <p className="text-sm text-slate-500 flex items-center gap-2"><Calendar size={14} /> Report Date: {selectedReport.date}</p>
-                 </div>
-                 <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold uppercase">Project Analysis</span>
-              </header>
-
-              {viewMode === 'chart' ? (
-                <div className="overflow-y-auto">
-                    <Charts data={selectedReport.data} projectName={selectedReport.projectName} />
-                </div>
-              ) : (
-                <div className="flex-1 min-h-0">
-                    <RawDataViewer sheets={selectedReport.rawSheets || {}} />
-                </div>
-              )}
-           </div>
-        ) : (
-           !isLoading && (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                <LayoutGrid size={48} className="mb-4 text-slate-300" />
-                <p>Select a project report from the sidebar</p>
             </div>
+            {selectedReport && selectedReport.data.rawData && (
+               <button 
+                 onClick={() => setShowRaw(!showRaw)} 
+                 className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+               >
+                 {showRaw ? <BarChartIcon size={16} /> : <FileText size={16} />}
+                 {showRaw ? 'Show Charts' : 'Show Raw Data'}
+               </button>
+            )}
+        </div>
+        {selectedReport ? (
+           showRaw && selectedReport.data.rawData ? (
+              <div className="h-[calc(100vh-140px)] animate-in fade-in">
+                 <h2 className="text-2xl font-bold text-slate-800 mb-4">原始数据 (Raw Data)</h2>
+                 <RawDataViewer data={selectedReport.data.rawData} />
+              </div>
+           ) : (
+             <div className="animate-in fade-in">
+                <header className="mb-8 flex justify-between items-center">
+                   <div>
+                      <h2 className="text-2xl font-bold text-slate-800">{selectedReport.projectName}</h2>
+                      <p className="text-sm text-slate-500 flex items-center gap-2"><Calendar size={14} /> Report Date: {selectedReport.date}</p>
+                   </div>
+                   <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold uppercase">Project Analysis</span>
+                </header>
+                <Charts data={selectedReport.data} projectName={selectedReport.projectName} />
+             </div>
            )
+        ) : (
+           <div className="flex flex-col items-center justify-center h-full text-slate-400">
+              <LayoutGrid size={48} className="mb-4 text-slate-300" />
+              <p>Select a project report from the sidebar</p>
+           </div>
         )}
       </main>
     </div>
